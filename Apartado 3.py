@@ -8,25 +8,17 @@ def validate_parameters(parameters):
     Valida y ajusta los parámetros para cumplir con las restricciones físicas.
 
     Args:
-        parameters (list): Lista con los valores de R, R0, Rg, Rs, L, t_chamber, t_cone, alpha, Mpl.
+        parameters (list): Lista con los valores de L, alpha, t_chamber, t_cone y Rg.
 
     Returns:
         list: Lista de parámetros válidos.
     """
-    R, R0, Rg, Rs, L, t_chamber, t_cone, alpha, Mpl = parameters
-
-    # Garantizar restricciones físicas
-    R = max(R, 1e-6)
-    R0 = max(R0, 1e-6)
-    Rg = max(Rg, 1e-6)
-    Rs = max(Rs, Rg + 1e-6)  # Rs debe ser mayor que Rg
-    L = max(L, 1e-6)
-    t_chamber = max(t_chamber, 1e-6)
-    t_cone = max(t_cone, 1e-6)
-    alpha = max(alpha, 1e-6)
-    Mpl = max(Mpl, 1e-6)
-
-    return [R, R0, Rg, Rs, L, t_chamber, t_cone, alpha, Mpl]
+    L = max(parameters[0], 1e-6)  # Garantizar que L sea positivo
+    alpha = max(parameters[1], 1e-6)  # Garantizar que alpha sea positivo
+    t_chamber = max(parameters[2], 1e-6)  # Garantizar que t_chamber sea positivo
+    t_cone = max(parameters[3], 1e-6)  # Garantizar que t_cone sea positivo
+    Rg = max(parameters[4], 1e-6)  # Garantizar que Rg sea positivo
+    return [L, alpha, t_chamber, t_cone, Rg]
 
 # Definir una función que llama al simulador y devuelve h_max
 def evaluate_hmax(parameters):
@@ -34,22 +26,22 @@ def evaluate_hmax(parameters):
     Evalúa el h_max para un conjunto dado de parámetros.
 
     Args:
-        parameters (list): Lista con los valores de R, R0, Rg, Rs, L, t_chamber, t_cone, alpha, Mpl.
+        parameters (list): Lista con los valores de L, alpha, t_chamber, t_cone y Rg.
 
     Returns:
         float: El valor negativo de h_max (para minimizar).
     """
     parameters = validate_parameters(parameters)
     simulation_params = {
-        'R': parameters[0],
-        'R0': parameters[1],
-        'Rg': parameters[2],
-        'Rs': parameters[3],
-        'L': parameters[4],
-        't_chamber': parameters[5],
-        't_cone': parameters[6],
-        'alpha': parameters[7],
-        'Mpl': parameters[8],
+        'R': 0.0225,  # Fijo
+        'R0': 0.005,  # Fijo
+        'Rg': parameters[4],
+        'Rs': 0.006,  # Fijo
+        'L': parameters[0],
+        't_chamber': parameters[2],
+        't_cone': parameters[3],
+        'alpha': parameters[1],
+        'Mpl': 2,  # Fijo
         # Constantes
         'Tc': 1000,
         'M_molar': 41.98e-3,
@@ -90,41 +82,33 @@ def evaluate_hmax(parameters):
 # Definir los límites para los parámetros y calcular el gradiente
 def optimize_hmax():
     """
-    Optimiza los parámetros para maximizar h_max usando un método basado en gradiente.
+    Optimiza los parámetros para maximizar h_max variando L, alpha, t_chamber, t_cone y Rg.
 
     Returns:
         dict: Resultados de la optimización con los parámetros óptimos y h_max.
     """
     bounds = [
-        (0.01, 0.1),    # R (m)
-        (0.001, 0.05),  # R0 (m)
-        (0.001, 0.05),  # Rg (m)
-        (0.001, 0.05),  # Rs (m)
-        (0.05, 0.5),    # L (m)
-        (0.001, 0.01),  # t_chamber (m)
-        (0.001, 0.01),  # t_cone (m)
-        (5, 30),        # alpha (grados)
-        (0.1, 5.0)      # Mpl (kg)
+        (0.05, 0.5),   # L (m)
+        (5, 30),       # alpha (grados)
+        (0.001, 0.01), # t_chamber (m)
+        (0.001, 0.01), # t_cone (m)
+        (0.001, 0.05)  # Rg (m)
     ]
 
     initial_guess = [
-        0.05,  # R
-        0.005,   # R0
-        0.005,   # Rg
-        0.006,   # Rs (inicialmente mayor que Rg)
-        0.4,    # L
-        0.002,   # t_chamber
-        0.002,   # t_cone
-        20,      # alpha
-        0.11      # Mpl
+        0.08,  # L (Longitud inicial del cohete)
+        20,    # alpha (Ángulo inicial del cono)
+        0.002, # t_chamber (Espesor inicial de la cámara)
+        0.002, # t_cone (Espesor inicial del cono)
+        0.005  # Rg (Radio inicial del cuello de la boquilla)
     ]
 
     # Ejecutar la optimización con límite de iteraciones
     options = {
         'maxiter': 50,  # Limitar el número máximo de iteraciones
         'disp': True,   # Mostrar información sobre el progreso
-        'ftol': 1e-3,   # Relajar la tolerancia de la función objetivo
-        'gtol': 1e-3    # Relajar la tolerancia del gradiente
+        'ftol': 1e-4,   # Relajar la tolerancia de la función objetivo
+        'gtol': 1e-4    # Relajar la tolerancia del gradiente
     }
 
     result = minimize(evaluate_hmax, initial_guess, bounds=bounds, method='L-BFGS-B', options=options)
@@ -142,7 +126,7 @@ def optimize_hmax():
 if __name__ == '__main__':
     try:
         results = optimize_hmax()
-        print(f"Parámetros óptimos: {results['optimized_parameters']}")
+        print(f"Parámetros óptimos L: {results['optimized_parameters'][0]}, alpha: {results['optimized_parameters'][1]}, t_chamber: {results['optimized_parameters'][2]}, t_cone: {results['optimized_parameters'][3]}, Rg: {results['optimized_parameters'][4]}")
         print(f"Altura máxima optimizada (h_max): {results['h_max']}")
     except RuntimeError as e:
         print(e)
