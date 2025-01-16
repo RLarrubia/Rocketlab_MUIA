@@ -1,102 +1,104 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from deap import base, creator, tools, algorithms
-from rocket_module import rocket
 
-# Clase cohete: función para calcular altura, masa y esfuerzo radiales
-def evaluar_cohete(parametros):
-    # Instancia de la clase ya implementada
-    # Ejemplo de llamada: Rocket([largo_camara, radio_camara, diametro_garganta, diametro_salida, ...])
-    cohete = rocket(parametros)
+# Definir límites
+low = [0.01, 0.005, 0.005, 0.005, 0.05, 0.001, 0.001, 5, 0.1]
+up = [0.1, 0.02, 0.02, 0.02, 0.5, 0.01, 0.01, 40, 5]
 
-    # Calcular resultados
-    resultados = cohete.results()
-    h_max = resultados["h_max"]
-    M_total = resultados["M_total"]
-    sigma_r = resultados["sigma_r"]
+# Parámetros
+SIGMA_ULT = 125  # Esfuerzo último (MPa)
+MIN_MASS = 1e-3  # Masa mínima (kg)
 
-    # Restricción: penalizar si el esfuerzo radial excede el límite permitido
-    sigma_ult = 125  # Cambia esto por el valor límite adecuado
-    if sigma_r > sigma_r:
-        print ("Esfuerzo último superado, el cohete no ha soportado las cargas")
-        print (f"El esfuerzo generado es de {sigma_r} MPa y supera los 125 MPa de esfuerzo último calculado")
-    else:
-        return h_max, M_total
-    
-# Definición del problema como minimización para DEAP
-creator.create("FitnessMin", base.Fitness, weights=(1.0, -1.0))  # Maximizar altura (+1.0), minimizar masa (-1.0)
-creator.create("Individual", list, fitness=creator.FitnessMin)
+# Evaluación rápida (ajustar según modelo físico)
+def evaluate_rocket(individual):
+    # Cálculos simulados (reemplazar con fórmulas reales si se tienen)
+    h_max = individual[0] * 1000  # Altura máxima simulada (m)
+    M_total = max(sum(individual) * 10, MIN_MASS)  # Masa total mínima
+    sigma_r = individual[0] * 10 + individual[3] * 5  # Esfuerzo radial simulado (MPa)
+    return h_max, M_total, sigma_r
 
-# Rango de las variables de diseño
-simulation_params = {
-        'R': (0.005, 0.025),
-        'R0': (0.005, 0.025),
-        'Rg': (0.0025, 0.015),  
-        'Rs': (0.005, 0.025),  
-        'L': (0.05, 0.5),
-        't_chamber': (0.002, 0.01), 
-        't_cone': (0.002, 0.01), 
-        'alpha': (10, 45), 
-        'Mpl': 2,  
-        # Constantes
-        'Tc': 1000,
-        'M_molar': 41.98e-3,
-        'M_molar_air': 28.97e-3,
-        'gamma': 1.3,
-        'gamma_air': 1.4,
-        'viscosity_air': 1.82e-05,
-        'rho_pr': 1800,
-        'rho_cone': 2700,
-        'rho_c': 2700,
-        'Rend': 1 - 0.4237,
-        'a': 6e-5,
-        'n': 0.32,
-        'Re': 6.37e6,
-        'g0': 9.80665,
-        'Ra': 287,
-        # Condiciones iniciales
-        'h0': 0,
-        'v0': 0,
-        't0': 0,
-        'solver_engine': 'RK4',
-        'solver_trayectory': 'Euler',
-        'dt_engine': 5e-5,
-        'dt_trayectory': 1e-3,
-        'stop_condition': 'max_height'
-    }
+# Penalización por restricciones
+def apply_constraints(individual):
+    Rg, Rs, R0, R = individual[2], individual[3], individual[1], individual[0]
+    penalty = 0
 
-# Crear individuo y población
-def crear_individuo():
-    return [np.random.uniform(simulation_params[var][0], simulation_params[var][1]) for var in simulation_params]
+    # Restricciones geométricas
+    if Rs <= Rg: penalty += 1e6 * (Rg - Rs + 1e-6)
+    if R0 >= R: penalty += 1e6 * (R0 - R + 1e-6)
 
+    # Restricción de esfuerzo radial
+    _, _, sigma_r = evaluate_rocket(individual)
+    if sigma_r <= SIGMA_ULT: penalty += 1e6 * (SIGMA_ULT - sigma_r + 1e-6)
+
+    return penalty
+
+# Evaluación ponderada
+def evaluate_weighted(individual, w_h=0.5, w_m=0.5):
+    penalty = apply_constraints(individual)
+    if penalty > 0: return penalty,
+    h_max, M_total, _ = evaluate_rocket(individual)
+    return -w_h * h_max + w_m * M_total,
+
+# Configuración de DEAP
+creator.create("FitnessSingle", base.Fitness, weights=(-1.0,))
+creator.create("Individual", list, fitness=creator.FitnessSingle)
 toolbox = base.Toolbox()
-toolbox.register("attr_float", crear_individuo)
-toolbox.register("individual", tools.initIterate, creator.Individual, toolbox.attr_float)
+toolbox.register("attr_float", np.random.uniform, low, up)
+toolbox.register("individual", tools.initIterate, creator.Individual, 
+                 lambda: [np.random.uniform(l, u) for l, u in zip(low, up)])
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-
-
-# Registro de funciones en el toolbox
-toolbox.register("evaluate", evaluar_cohete)
 toolbox.register("mate", tools.cxBlend, alpha=0.5)
-toolbox.register("mutate", tools.mutPolynomialBounded, low=[simulation_params[var][0] for var in simulation_params], 
-                 up=[simulation_params[var][1] for var in simulation_params], eta=20.0, indpb=0.2)
-toolbox.register("select", tools.selNSGA2)
+toolbox.register("mutate", tools.mutPolynomialBounded, low=low, up=up, eta=20.0, indpb=0.2)
+toolbox.register("select", tools.selTournament, tournsize=3)
+toolbox.register("evaluate", evaluate_weighted)
 
-# Configuración del algoritmo genético
-pop_size = 100
-ngen = 200
-cxpb = 0.7
-mutpb = 0.2
+# Algoritmo evolutivo
+if __name__ == '__main__':
+    pop_size = 75  # Tamaño de la población
+    n_gen = 25  # Número de generaciones
 
-# Generar población inicial
-population = toolbox.population(n=pop_size)
+    pop = toolbox.population(n=pop_size)
+    stats = tools.Statistics(lambda ind: ind.fitness.values)
+    stats.register("avg", np.mean)
+    stats.register("std", np.std)
+    stats.register("min", np.min)
+    stats.register("max", np.max)
 
-# Optimización evolutiva
-algorithms.eaMuPlusLambda(population, toolbox, mu=pop_size, lambda_=pop_size*2, cxpb=cxpb, mutpb=mutpb, ngen=ngen,
-                          stats=None, halloffame=None, verbose=True)
+    pop, logbook = algorithms.eaSimple(pop, toolbox, cxpb=0.7, mutpb=0.2, ngen=n_gen, 
+                                       stats=stats, verbose=True)
 
-# Extraer frente de Pareto
-pareto_front = tools.sortNondominated(population, len(population), first_front_only=True)[0]
+    # Obtener los valores evaluados para graficar
+h_values, m_values = [], []
+for ind in pop:
+    h, m, _ = evaluate_rocket(ind)
+    h_values.append(h)
+    m_values.append(m)
 
-# Mostrar resultados del frente de Pareto
-for ind in pareto_front:
-    print(f"Altura máxima: {-ind.fitness.values[0]:.2f}, Masa total: {ind.fitness.values[1]:.2f}, Parámetros: {ind}")
+# Encontrar los puntos extremos
+max_h_index = np.argmax(h_values)  # Índice del punto con máxima altura
+min_m_index = np.argmin(m_values)  # Índice del punto con mínima masa
+
+# Valores extremos
+max_h_point = (m_values[max_h_index], h_values[max_h_index])
+min_m_point = (m_values[min_m_index], h_values[min_m_index])
+
+# Graficar resultados
+plt.figure(figsize=(12, 8))
+
+# Graficar puntos evaluados
+plt.scatter(m_values, h_values, c="blue", label="Puntos evaluados", alpha=1.0)
+
+# Graficar los puntos extremos
+plt.scatter(*max_h_point, c="green", edgecolor="black", s=150, label="Máxima altura")
+plt.scatter(*min_m_point, c="orange", edgecolor="black", s=150, label="Mínima masa")
+
+# Detalles de la gráfica
+plt.title("Altura máxima vs Masa total", fontsize=14)
+plt.xlabel("Masa total (kg)", fontsize=12)
+plt.ylabel("Altura máxima (m)", fontsize=12)
+plt.legend(fontsize=12, loc="lower left")  # Mover la leyenda a la esquina inferior izquierda
+plt.grid()
+plt.savefig("extreme_points.png")  # Guardar gráfica
+plt.show()
+
