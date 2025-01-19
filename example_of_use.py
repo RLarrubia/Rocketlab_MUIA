@@ -10,7 +10,7 @@ parameters = {
 't_chamber': 0.002,
 't_cone': 0.002,
 'alpha': 20, # degrees
-'Mpl': 0.5,
+'Mpl': 2,
 
 ## Constants
 'Tc': 1000,

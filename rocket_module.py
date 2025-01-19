@@ -90,7 +90,7 @@ class rocket():
             self.rocket_trayectory.solve_step(dt=self.dt_trayectory if not engine_on else None, 
                                               E=self.rocket_engine.E_t[-1], Cd=cd0, M=self.rocket_engine.Mp_t[-1]+self.Mi)
             if self.rocket_trayectory.flag_stop_condition(self.stop_condition): break 
-
+            if not engine_on and self.rocket_trayectory.h_t[-1] == 0: break #! check compatibility with other cases
         self.results_2_csv()
 
 
