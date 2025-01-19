@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from deap import base, creator, tools, algorithms
 
 # Definir límites
-low = [0.01, 0.005, 0.005, 0.005, 0.05, 0.001, 0.001, 5, 0.1]
-up = [0.1, 0.02, 0.02, 0.02, 0.5, 0.01, 0.01, 40, 5]
+low = [0.01, 0.005, 0.005, 0.005, 0.05, 0.001, 0.001, 5, 2]
+up = [0.1, 0.02, 0.02, 0.02, 0.5, 0.01, 0.01, 40, 2.001]
 
 # Parámetros
 SIGMA_ULT = 125  # Esfuerzo último (MPa)
@@ -34,7 +34,7 @@ def apply_constraints(individual):
     return penalty
 
 # Evaluación ponderada
-def evaluate_weighted(individual, w_h=0.5, w_m=0.5):
+def evaluate_weighted(individual, w_h=0.2, w_m=0.8):
     penalty = apply_constraints(individual)
     if penalty > 0: return penalty,
     h_max, M_total, _ = evaluate_rocket(individual)
