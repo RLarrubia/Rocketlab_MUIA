@@ -77,7 +77,7 @@ def evaluate_hmax(parameters):
         return -result['h_max']  # Negativo porque estamos minimizando
     except Exception as e:
         print(f"Error en la simulación: {e}")
-        return 1e6  # Penalización alta pero finita
+        return 1e6  # Penalización alta, pero finita
 
 # Definir los límites para los parámetros y calcular el gradiente
 def optimize_hmax():
@@ -89,17 +89,17 @@ def optimize_hmax():
     """
     bounds = [
         (0.05, 0.5),   # L (m)
-        (5, 30),       # alpha (grados)
-        (0.001, 0.01), # t_chamber (m)
-        (0.001, 0.01), # t_cone (m)
-        (0.001, 0.05)  # Rg (m)
+        (10, 45),       # alpha (grados)
+        (0.002, 0.01), # t_chamber (m)
+        (0.002, 0.01), # t_cone (m)
+        (0.0025, 0.015)  # Rg (m)
     ]
 
     initial_guess = [
         0.08,  # L (Longitud inicial del cohete)
         20,    # alpha (Ángulo inicial del cono)
-        0.002, # t_chamber (Espesor inicial de la cámara)
-        0.002, # t_cone (Espesor inicial del cono)
+        0.003, # t_chamber (Espesor inicial de la cámara)
+        0.003, # t_cone (Espesor inicial del cono)
         0.005  # Rg (Radio inicial del cuello de la boquilla)
     ]
 
